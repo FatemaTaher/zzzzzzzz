@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservation History</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            position: relative;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #e3f2fd;
+        }
+        .status-pending {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        .status-approved, .status-accepted, .status-acceptd {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+        .status-rejected {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .status-canceled {
+            color: #9c9c9c;
+            font-weight: bold;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+        .error {
+            color: #e74c3c;
+            text-align: center;
+            padding: 20px;
+            font-weight: bold;
+        }
+        .error button {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .comment-cell {
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .refresh-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin-right: 10px;
+        }
+        .refresh-btn:hover {
+            background-color: #2980b9;
+        }
+        #logoutBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #e74c3c;
+            padding: 8px 15px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #logoutBtn:hover {
+            background-color: #c0392b;
+        }
+        .filter-container {
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .filter-group label {
+            font-weight: bold;
+            color: #34495e;
+        }
+        .filter-group select,
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .filter-btn {
+            padding: 8px 16px;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .filter-btn:hover {
+            background-color: #27ae60;
+        }
+        .reset-btn {
+            padding: 8px 16px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .reset-btn:hover {
+            background-color: #c0392b;
+        }
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <button id="logoutBtn">Logout</button>
+
+    <div class="container">
+        <h1>Reservation History</h1>
+        
+        <div class="action-buttons">
+            <button class="refresh-btn" onclick="loadReservationHistory()">Refresh Data</button>
+        </div>
+        
+        <div class="filter-container">
+            <div class="filter-group">
+                <label for="idFilter">Reservation ID:</label>
+                <input type="text" id="idFilter" placeholder="Enter ID">
+            </div>
+            
+            <div class="filter-group">
+                <label for="statusFilter">Status:</label>
+                <select id="statusFilter">
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="canceled">Canceled</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="dateFrom">From:</label>
+                <input type="date" id="dateFrom">
+            </div>
+            
+            <div class="filter-group">
+                <label for="dateTo">To:</label>
+                <input type="date" id="dateTo">
+            </div>
+            
+            <button class="filter-btn" onclick="applyFilters()">Apply Filters</button>
+            <button class="reset-btn" onclick="resetFilters()">Reset Filters</button>
+        </div>
+        
+        <table id="historyTable">
+            <thead>
+                <tr>
+                    <th>Reservation ID</th>
+                    <th>Status</th>
+                    <th>Date & Time</th>
+                    <th>Action By</th>
+                    <th>Comments</th>
+                </tr>
+            </thead>
+            <tbody id="historyData">
+                <tr>
+                    <td colspan="5" class="loading">Loading reservation history...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let allReservations = []; // To store all reservations for filtering
+        
+        // Check authentication and get professorId from localStorage
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('authToken');
+            const userRole = localStorage.getItem('userRole');
+            
+            if (!token || userRole !== 'professor') {
+                alert('Please login as professor first');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Set up logout button
+            document.getElementById('logoutBtn').addEventListener('click', function() {
+                localStorage.clear();
+                window.location.href = 'login.html';
+            });
+
+            // Load initial data
+            loadReservationHistory();
+        });
+        
+        function loadReservationHistory() {
+            const professorId = localStorage.getItem('userId');
+            if (!professorId) {
+                document.getElementById('historyData').innerHTML = `
+                    <tr>
+                        <td colspan="5" class="error">
+                            User ID not found. Please login again.
+                            <button onclick="window.location.href='login.html'">Go to Login</button>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const tbody = document.getElementById('historyData');
+            const token = localStorage.getItem('authToken');
+            
+            tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading reservation history...</td></tr>';
+            
+            fetch(`http://localhost:2020/professors/allReservationsHistory/${professorId}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/xml',
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        localStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(xmlText => {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                
+                // Check for XML parsing errors
+                const parserError = xmlDoc.getElementsByTagName("parsererror");
+                if (parserError.length > 0) {
+                    throw new Error("Error parsing XML response");
+                }
+                
+                const items = xmlDoc.getElementsByTagName("item");
+                tbody.innerHTML = '';
+                
+                if (items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5">No reservation history found</td></tr>';
+                    return;
+                }
+                
+                // Clear previous data
+                allReservations = [];
+                
+                for (let item of items) {
+                    const reservationId = item.getElementsByTagName("reservationId")[0].textContent;
+                    const status = item.getElementsByTagName("status")[0].textContent;
+                    const actionBy = item.getElementsByTagName("actionBy")[0].textContent;
+                    const comment = item.getElementsByTagName("comment")[0]?.textContent || '';
+                    
+                    // Parse the actionTime components
+                    const timeParts = item.getElementsByTagName("actionTime");
+                    const year = timeParts[0].textContent;
+                    const month = timeParts[1].textContent.padStart(2, '0');
+                    const day = timeParts[2].textContent.padStart(2, '0');
+                    const hour = timeParts[3].textContent.padStart(2, '0');
+                    const minute = timeParts[4].textContent.padStart(2, '0');
+                    const second = timeParts[5].textContent.padStart(2, '0');
+                    
+                    const formattedDate = `${year}-${month}-${day}`;
+                    const formattedTime = `${hour}:${minute}:${second}`;
+                    const fullDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+                    
+                    // Store reservation data for filtering
+                    const reservation = {
+                        id: reservationId,
+                        status: status,
+                        actionBy: actionBy,
+                        comment: comment,
+                        formattedDate: formattedDate,
+                        formattedTime: formattedTime,
+                        fullDate: fullDate
+                    };
+                    
+                    allReservations.push(reservation);
+                }
+                
+                // Display all reservations initially
+                displayReservations(allReservations);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="error">
+                            Error loading reservation history: ${error.message}
+                            <button onclick="loadReservationHistory()">Try Again</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+        
+        function displayReservations(reservations) {
+            const tbody = document.getElementById('historyData');
+            tbody.innerHTML = '';
+            
+            if (reservations.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5">No reservations match the selected filters</td></tr>';
+                return;
+            }
+            
+            reservations.forEach(reservation => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${reservation.id}</td>
+                    <td class="status-${reservation.status.toLowerCase()}">${reservation.status}</td>
+                    <td>${reservation.formattedDate}<br>${reservation.formattedTime}</td>
+                    <td>${reservation.actionBy}</td>
+                    <td class="comment-cell" title="${reservation.comment}">${reservation.comment}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function applyFilters() {
+            const idFilter = document.getElementById('idFilter').value.trim();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            
+            let filtered = [...allReservations];
+            
+            // Apply ID filter
+            if (idFilter) {
+                filtered = filtered.filter(res => res.id.includes(idFilter));
+            }
+            
+            // Apply status filter
+            if (statusFilter !== 'all') {
+                filtered = filtered.filter(res => res.status.toLowerCase() === statusFilter);
+            }
+            
+            // Apply date range filter
+            if (dateFrom) {
+                const fromDate = new Date(dateFrom);
+                filtered = filtered.filter(res => res.fullDate >= fromDate);
+            }
+            
+            if (dateTo) {
+                const toDate = new Date(dateTo);
+                toDate.setHours(23, 59, 59); // Include the entire end day
+                filtered = filtered.filter(res => res.fullDate <= toDate);
+            }
+            
+            displayReservations(filtered);
+        }
+        
+        function resetFilters() {
+            document.getElementById('idFilter').value = '';
+            document.getElementById('statusFilter').value = 'all';
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value = '';
+            displayReservations(allReservations);
+        }
+    </script>
+</body>
+</html>

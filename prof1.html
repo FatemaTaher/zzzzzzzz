@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Professor Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #008cff34;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .dashboard {
+            max-width: 1000px;
+            margin: auto;
+        }
+        .endpoint-form {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .endpoint-form h2 {
+            margin-top: 0;
+        }
+        label, input, textarea {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        input, textarea {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .response {
+            white-space: pre-wrap;
+            background: #4876ff6d;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Professor Dashboard</h1>
+    <div class="dashboard">
+        <div class="endpoint-form">
+            <h2>1. Reserve Room (POST)</h2>
+            <form id="reserveForm">
+                <label>Room ID:</label>
+                <input type="number" id="roomID">
+                <label>Number of Students:</label>
+                <input type="number" id="nofStudents">
+                <label>Course ID:</label>
+                <input type="number" id="courseID">
+                <label>Professor ID:</label>
+                <input type="number" id="professorID">
+                <label>Time (yyyy-mm-ddTHH:MM:SS):</label>
+                <input type="text" id="time">
+                <button type="submit">Reserve</button>
+            </form>
+            <div class="response" id="reserveResponse"></div>
+        </div>
+
+        <div class="endpoint-form">
+            <h2>2. Cancel Reservation (DELETE)</h2>
+            <form id="cancelForm">
+                <label>Reservation ID:</label>
+                <input type="number" id="cancelId">
+                <button type="submit">Cancel Reservation</button>
+            </form>
+            <div class="response" id="cancelResponse"></div>
+        </div>
+
+        <div class="endpoint-form">
+            <h2>3. View Reservation Status (GET)</h2>
+            <form id="statusForm">
+                <label>Reservation ID:</label>
+                <input type="number" id="statusId">
+                <button type="submit">Check Status</button>
+            </form>
+            <div class="response" id="statusResponse"></div>
+        </div>
+
+        <div class="endpoint-form">
+            <h2>4. View Reservation History (GET)</h2>
+            <form id="historyForm">
+                <label>Reservation ID:</label>
+                <input type="number" id="historyId">
+                <button type="submit">View History</button>
+            </form>
+            <div class="response" id="historyResponse"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById("reserveForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const xmlData = `
+                <reservationRequestDTO>
+                    <roomID>${document.getElementById("roomID").value}</roomID>
+                    <nofStudents>${document.getElementById("nofStudents").value}</nofStudents>
+                    <courseID>${document.getElementById("courseID").value}</courseID>
+                    <professorID>${document.getElementById("professorID").value}</professorID>
+                    <time>${document.getElementById("time").value}</time>
+                </reservationRequestDTO>
+            `;
+            sendXml("/professors/reserveRoom", "POST", xmlData, "reserveResponse");
+        });
+
+        document.getElementById("cancelForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const id = document.getElementById("cancelId").value;
+            sendXml("/professors/cancelReservation/" + id, "DELETE", null, "cancelResponse");
+        });
+
+        document.getElementById("statusForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const id = document.getElementById("statusId").value;
+            sendXml("/professors/reservationStatus/" + id, "GET", null, "statusResponse");
+        });
+
+        document.getElementById("historyForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const id = document.getElementById("historyId").value;
+            sendXml("/professors/reservationsHistory/" + id, "GET", null, "historyResponse");
+        });
+
+        async function sendXml(endpoint, method, xmlBody = null, responseId) {
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/xml',
+                    'Accept': 'application/xml,text/plain'
+                }
+            };
+            if (xmlBody) {
+                options.body = xmlBody;
+            }
+            try {
+                const response = await fetch('http://localhost:2020' + endpoint, options);
+                const text = await response.text();
+                const formattedResponse = formatResponse(text); // تنسيق البيانات هنا
+                document.getElementById(responseId).innerText = formattedResponse;
+            } catch (error) {
+                document.getElementById(responseId).innerText = 'Error: ' + error.message;
+            }
+        }
+
+        function formatResponse(xmlText) {
+            let parser = new DOMParser();
+            let xmlDoc = parser.parseFromString(xmlText, "application/xml");
+
+            let items = xmlDoc.getElementsByTagName("item");
+            let formattedText = "";
+
+            for (let i = 0; i < items.length; i++) {
+                let status = items[i].getElementsByTagName("status")[0].textContent;
+                let actionTime = items[i].getElementsByTagName("actionTime")[0].textContent;
+                let actionBy = items[i].getElementsByTagName("actionBy")[0].textContent;
+                let comment = items[i].getElementsByTagName("comment")[0].textContent;
+
+                formattedText += `Status: ${status}\nAction Time: ${actionTime}\nAction By: ${actionBy}\nComment: ${comment}\n\n`;
+            }
+            return formattedText || "No data available";
+        }
+    </script>
+</body>
+</html>

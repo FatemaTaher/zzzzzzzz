@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cancel Reservation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            width: 90%;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .cancel-btn {
+            margin-top: 15px;
+            padding: 12px 25px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        .cancel-btn:hover {
+            background-color: #c0392b;
+            transform: translateY(-2px);
+        }
+        .cancel-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result-card {
+            padding: 25px;
+            border-radius: 6px;
+            margin: 25px 0;
+            background-color: #f8f9fa;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        .success {
+            color: #2ecc71;
+            font-weight: bold;
+            border-left: 4px solid #2ecc71;
+        }
+        .error {
+            color: #e74c3c;
+            font-weight: bold;
+            border-left: 4px solid #e74c3c;
+        }
+        .loading {
+            color: #7f8c8d;
+            font-style: italic;
+            margin: 20px 0;
+            display: none;
+        }
+        .timestamp {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Cancel Reservation</h2>
+        
+        <form id="cancelForm">
+            <div class="form-group">
+                <label for="reservationId">Reservation ID:</label>
+                <input type="number" id="reservationId" name="reservationId" required min="1">
+            </div>
+            <button type="submit" class="cancel-btn" id="cancelButton">Cancel Reservation</button>
+        </form>
+        
+        <div id="loading" class="loading">Processing your request...</div>
+        
+        <div id="resultCard" class="result-card">
+            <div id="resultText"></div>
+            <div id="timestamp" class="timestamp"></div>
+        </div>
+    </div>
+
+    <script>
+        const cancelForm = document.getElementById('cancelForm');
+        const cancelButton = document.getElementById('cancelButton');
+        const loadingElement = document.getElementById('loading');
+        const resultCard = document.getElementById('resultCard');
+        const resultText = document.getElementById('resultText');
+        const timestampElement = document.getElementById('timestamp');
+
+        cancelForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const reservationId = document.getElementById('reservationId').value;
+            if (!reservationId) {
+                showResult('Please enter a reservation ID', 'error');
+                return;
+            }
+            
+            // Disable button and show loading
+            cancelButton.disabled = true;
+            loadingElement.style.display = 'block';
+            resultCard.style.display = 'none';
+            
+            try {
+                const response = await fetch(`http://localhost:2020/professors/cancelReservation/${reservationId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/xml'
+                    }
+                });
+                
+                const text = await response.text();
+                
+                if (response.ok) {
+                    showResult(text, 'success');
+                } else {
+                    throw new Error(text || `Server returned status: ${response.status}`);
+                }
+            } catch (error) {
+                showResult(`Error: ${error.message}`, 'error');
+                console.error('Error:', error);
+            } finally {
+                cancelButton.disabled = false;
+                loadingElement.style.display = 'none';
+            }
+        });
+
+        function showResult(message, type) {
+            resultCard.className = 'result-card ' + type;
+            resultText.innerHTML = message;
+            timestampElement.textContent = `Last action: ${new Date().toLocaleString()}`;
+            resultCard.style.display = 'block';
+            
+            // Scroll to result
+            resultCard.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

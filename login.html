@@ -1,0 +1,132 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        .login-container {
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            width: 300px;
+        }
+
+        .login-container h2 {
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .error-message {
+            color: red;
+            text-align: center;
+            font-size: 14px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>Login</h2>
+        <div class="error-message" id="error-message">Invalid credentials, please try again!</div>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="name">Username</label>
+                <input type="text" id="name" name="name" placeholder="Enter username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+
+    <script>
+        // Function to handle form submission
+        document.getElementById("login-form").addEventListener("submit", function(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            // Get user input
+            const name = document.getElementById("name").value;
+            const password = document.getElementById("password").value;
+
+            // Create the XML data
+            const xmlData = `
+                <loginRequest>
+                    <name>${name}</name>
+                    <password>${password}</password>
+                </loginRequest>
+            `;
+
+
+            // Send POST request to back-end API
+            fetch('http://localhost:2020/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/xml',
+                },
+                body: xmlData,
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data.includes('<token>')) {  // Check if token is present in the response
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(data, "application/xml");
+                    const token = xmlDoc.getElementsByTagName('token')[0].childNodes[0].nodeValue;
+                    const role = xmlDoc.getElementsByTagName('role')[0].childNodes[0].nodeValue;
+                    
+                    localStorage.setItem("token", token);
+                    localStorage.setItem("role", role);
+                    window.location.href = "/dashboard"; // Redirect to dashboard (for example)
+                } else {
+                    // If login failed, show error message
+                    document.getElementById("error-message").style.display = "block";
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+                document.getElementById("error-message").style.display = "block";
+            });
+        });
+    </script>
+</body>
+</html>

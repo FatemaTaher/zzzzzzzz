@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Course Details</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            position: relative;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .course-details {
+            margin-top: 30px;
+        }
+        .course-card {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3498db;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .course-card h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .detail-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .detail-label {
+            font-weight: bold;
+            width: 120px;
+            color: #34495e;
+        }
+        .detail-value {
+            flex: 1;
+        }
+        .not-assigned {
+            color: #e74c3c;
+            font-style: italic;
+        }
+        #logoutBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #e74c3c;
+            padding: 8px 15px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #logoutBtn:hover {
+            background-color: #c0392b;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+        .error {
+            color: #e74c3c;
+            text-align: center;
+            padding: 40px;
+            font-weight: bold;
+        }
+        .refresh-btn {
+            padding: 8px 16px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .refresh-btn:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <button id="logoutBtn">Logout</button>
+
+    <div class="container">
+        <h1>My Course Details</h1>
+        
+        <div id="loading" class="loading">Loading your course details...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div id="courseDetails" class="course-details" style="display: none;">
+            <!-- Course details will be inserted here by JavaScript -->
+        </div>
+        
+        <div style="text-align: center;">
+            <button class="refresh-btn" onclick="fetchCourseDetails()">Refresh Data</button>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication and get studentId
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('authToken');
+            const userRole = localStorage.getItem('userRole');
+            const studentId = localStorage.getItem('userId');
+            
+            if (!token || userRole !== 'student' || !studentId) {
+                alert('Please login as student first');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Set up logout button
+            document.getElementById('logoutBtn').addEventListener('click', function() {
+                localStorage.clear();
+                window.location.href = 'login.html';
+            });
+
+            // Load course details
+            fetchCourseDetails();
+        });
+
+        async function fetchCourseDetails() {
+            const studentId = localStorage.getItem('userId');
+            const token = localStorage.getItem('authToken');
+            const loadingElement = document.getElementById('loading');
+            const errorElement = document.getElementById('error');
+            const courseDetailsElement = document.getElementById('courseDetails');
+            
+            try {
+                loadingElement.style.display = 'block';
+                errorElement.style.display = 'none';
+                courseDetailsElement.style.display = 'none';
+                
+                // Add timeout to fetch request
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 5000);
+                
+                const response = await fetch(`http://localhost:2020/students/viewCourseDetails/${studentId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/xml',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeout);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const xmlText = await response.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                
+                // Check for XML parsing errors
+                const parserError = xmlDoc.getElementsByTagName("parsererror");
+                if (parserError.length > 0) {
+                    throw new Error("Error parsing XML response");
+                }
+                
+                displayCourseDetails(xmlDoc);
+                
+            } catch (error) {
+                console.error('Fetch error:', error);
+                loadingElement.style.display = 'none';
+                
+                let errorMessage = error.message;
+                if (error.name === 'AbortError') {
+                    errorMessage = "Request timed out. Please check your connection and try again.";
+                } else if (error.message.includes('Failed to fetch')) {
+                    errorMessage = "Could not connect to server. Please try again later.";
+                }
+                
+                errorElement.innerHTML = `
+                    ${errorMessage}
+                    <button class="refresh-btn" onclick="fetchCourseDetails()">Try Again</button>
+                `;
+                errorElement.style.display = 'block';
+            }
+        }
+
+        function displayCourseDetails(xmlDoc) {
+            const loadingElement = document.getElementById('loading');
+            const courseDetailsElement = document.getElementById('courseDetails');
+            const items = xmlDoc.getElementsByTagName("item");
+            
+            loadingElement.style.display = 'none';
+            courseDetailsElement.innerHTML = '';
+            
+            if (items.length === 0) {
+                courseDetailsElement.innerHTML = '<div class="course-card">No courses found</div>';
+                courseDetailsElement.style.display = 'block';
+                return;
+            }
+            
+            for (let item of items) {
+                const courseText = item.textContent;
+                const courseCard = document.createElement('div');
+                courseCard.className = 'course-card';
+                
+                if (courseText.includes("Not assigned yet")) {
+                    // Handle not assigned case
+                    const courseId = courseText.match(/Course ID: (\d+)/)[1];
+                    courseCard.innerHTML = `
+                        <h3>Course ID: ${courseId}</h3>
+                        <div class="not-assigned">This course has not been assigned yet</div>
+                    `;
+                } else {
+                    // Parse assigned course details
+                    const details = courseText.match(/Course ID: (\d+), Professor: (.+), Room: (\d+), Time: (.+)/);
+                    if (details) {
+                        const [_, courseId, professor, room, time] = details;
+                        const formattedTime = formatDateTime(time);
+                        
+                        courseCard.innerHTML = `
+                            <h3>Course ID: ${courseId}</h3>
+                            <div class="detail-row">
+                                <div class="detail-label">Professor:</div>
+                                <div class="detail-value">${professor}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Room:</div>
+                                <div class="detail-value">${room}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">Time:</div>
+                                <div class="detail-value">${formattedTime}</div>
+                            </div>
+                        `;
+                    } else {
+                        // Fallback if parsing fails
+                        courseCard.innerHTML = `
+                            <h3>Course Details</h3>
+                            <div>${courseText}</div>
+                        `;
+                    }
+                }
+                
+                courseDetailsElement.appendChild(courseCard);
+            }
+            
+            courseDetailsElement.style.display = 'block';
+        }
+
+        function formatDateTime(dateTimeString) {
+            try {
+                // Remove the ".0" at the end if exists
+                const cleanedString = dateTimeString.replace(/\.0$/, '');
+                const date = new Date(cleanedString);
+                
+                // Format as "Day, Month Date, Year at HH:MM AM/PM"
+                const options = { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                };
+                return date.toLocaleDateString('en-US', options);
+            } catch (e) {
+                console.error('Error formatting date:', e);
+                return dateTimeString; // Return original if formatting fails
+            }
+        }
+    </script>
+</body>
+</html>

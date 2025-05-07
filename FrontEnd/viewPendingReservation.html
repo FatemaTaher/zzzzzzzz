@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pending Reservations</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1000px;
+      width: 90%;
+      margin: 20px auto;
+      background-color: white;
+      padding: 25px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h2 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      padding: 12px 15px;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background-color: #3498db;
+      color: white;
+      font-weight: bold;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f2f2f2;
+    }
+
+    tr:hover {
+      background-color: #e3f2fd;
+    }
+
+    .action-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .action-buttons button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .accept {
+      background-color: #2ecc71;
+    }
+
+    .reject {
+      background-color: #e74c3c;
+    }
+
+    .action-buttons button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    .action-buttons button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      font-style: italic;
+      color: #7f8c8d;
+    }
+
+    .error {
+      color: #e74c3c;
+      text-align: center;
+      padding: 20px;
+      font-weight: bold;
+    }
+
+    .error button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .status-pending {
+      color: #f39c12;
+      font-weight: bold;
+    }
+
+    .status-accepted {
+      color: #2ecc71;
+      font-weight: bold;
+    }
+
+    .status-rejected {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>Pending Reservations</h2>
+    <table id="reservationTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Status</th>
+          <th>Time</th>
+          <th>Course</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="5" class="loading">Loading reservations...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:2020";
+
+    function formatTime(timestamp) {
+      if (!timestamp) return 'N/A';
+      try {
+        const date = new Date(parseInt(timestamp));
+        return date.toLocaleString();
+      } catch (e) {
+        return timestamp;
+      }
+    }
+
+    function getXmlValue(xmlElement, tagName) {
+      const elements = xmlElement.getElementsByTagName(tagName);
+      return elements.length > 0 ? elements[0].textContent : 'N/A';
+    }
+
+    async function fetchReservations() {
+      const tbody = document.querySelector("#reservationTable tbody");
+      try {
+        tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading reservations...</td></tr>';
+        
+        // Add cache busting parameter
+        const res = await fetch(`${API_BASE}/admins/viewPendingReservation?t=${new Date().getTime()}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/xml',
+            'Cache-Control': 'no-cache',
+            'Authorization': 'Bearer ' + localStorage.getItem("authToken")
+
+          }
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+
+        const text = await res.text();
+        console.log("Raw XML response:", text); // Debugging
+        
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(text, "application/xml");
+        
+        const parserError = xmlDoc.getElementsByTagName("parsererror");
+        if (parserError.length > 0) {
+          throw new Error("XML Parse Error: " + parserError[0].textContent);
+        }
+
+        const items = xmlDoc.getElementsByTagName("item");
+        
+        tbody.innerHTML = "";
+
+        if (items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5">No pending reservations found</td></tr>';
+          return;
+        }
+
+        for (let item of items) {
+          const id = getXmlValue(item, "id");
+          const status = getXmlValue(item, "status");
+          const time = formatTime(getXmlValue(item, "time"));
+          
+          let courseName = 'N/A';
+          const courseElement = item.getElementsByTagName("course")[0];
+          if (courseElement) {
+            courseName = getXmlValue(courseElement, "name");
+          }
+
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${id}</td>
+            <td class="status-${status.toLowerCase()}">${status}</td>
+            <td>${time}</td>
+            <td>${courseName}</td>
+            <td class="action-buttons">
+              <button class="accept" onclick="updateStatus(${id}, 'accepted', this)" 
+                ${status.toLowerCase() !== 'pending' ? 'disabled' : ''}>
+                ${status === 'accepted' ? 'Accepted' : 'Accept'}
+              </button>
+              <button class="reject" onclick="updateStatus(${id}, 'rejected', this)" 
+                ${status.toLowerCase() !== 'pending' ? 'disabled' : ''}>
+                ${status === 'rejected' ? 'Rejected' : 'Reject'}
+              </button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        }
+      } catch (error) {
+        console.error("Error fetching reservations:", error);
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="error">
+              Error loading data: ${error.message}
+              <button onclick="fetchReservations()">Retry</button>
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    async function updateStatus(id, status, btn) {
+      const row = btn.closest('tr');
+      const allButtons = row.querySelectorAll('.action-buttons button');
+      const originalText = btn.innerText;
+      
+      try {
+        // Disable all buttons in the row during processing
+        allButtons.forEach(button => {
+          button.disabled = true;
+          if (button === btn) {
+            button.innerText = status === "accepted" ? "Processing..." : "Processing...";
+          }
+        });
+
+        const res = await fetch(`${API_BASE}/admins/updateReservationStatus/${id}?status=${status}&t=${new Date().getTime()}`, {
+          method: 'PUT',
+          headers: {
+            'Accept': 'application/xml',
+            'Authorization': 'Bearer ' + localStorage.getItem("authToken")
+
+          }
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || "Failed to update status");
+        }
+
+        // Refresh the entire table after successful update
+        await fetchReservations();
+        
+      } catch (error) {
+        console.error("Update error:", error);
+        alert(`Error: ${error.message}`);
+        
+        // Restore buttons on error
+        allButtons.forEach(button => {
+          button.disabled = false;
+          button.innerText = button.classList.contains('accept') ? "Accept" : "Reject";
+        });
+      }
+    }
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', fetchReservations);
+
+    // Auto-refresh every 30 seconds
+    setInterval(fetchReservations, 30000);
+  </script>
+
+</body>
+</html>
+
+

@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Available Courses</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            position: relative;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .course-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .course-table th, .course-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .course-table th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        .course-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .course-table tr:hover {
+            background-color: #e3f2fd;
+        }
+        .action-btn {
+            padding: 8px 16px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .register-btn {
+            background-color: #2ecc71;
+        }
+        .register-btn:hover {
+            background-color: #27ae60;
+        }
+        .drop-btn {
+            background-color: #e74c3c;
+        }
+        .drop-btn:hover {
+            background-color: #c0392b;
+        }
+        .details-btn {
+            background-color: #3498db;
+        }
+        .details-btn:hover {
+            background-color: #2980b9;
+        }
+        .action-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        #logoutBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #e74c3c;
+            padding: 8px 15px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #logoutBtn:hover {
+            background-color: #c0392b;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+        .error {
+            color: #e74c3c;
+            text-align: center;
+            padding: 20px;
+            font-weight: bold;
+        }
+        .result {
+            margin-top: 25px;
+            padding: 20px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .details-container {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+        }
+        .details-container p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <button id="logoutBtn">Logout</button>
+
+    <div class="container">
+        <h1>Available Courses</h1>
+        
+        <div id="result" class="result" style="display: none;"></div>
+        
+        <table class="course-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Course Name</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="coursesData">
+                <tr>
+                    <td colspan="3" class="loading">Loading courses data...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Global variable to store registered courses
+        let registeredCourses = [];
+
+        // Check authentication and get studentId
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('authToken');
+            const userRole = localStorage.getItem('userRole');
+            const studentId = localStorage.getItem('userId');
+            
+            if (!token || userRole !== 'student' || !studentId) {
+                alert('Please login as student first');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Set up logout button
+            document.getElementById('logoutBtn').addEventListener('click', function() {
+                localStorage.clear();
+                window.location.href = 'login.html';
+            });
+
+            // Load all courses
+            fetchCourses(studentId, token);
+        });
+
+        async function fetchCourses(studentId, token) {
+            const coursesData = document.getElementById('coursesData');
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                coursesData.innerHTML = '<tr><td colspan="3" class="loading">Loading courses data...</td></tr>';
+                resultDiv.style.display = 'none';
+                
+                // Add timeout to fetch request
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 5000);
+                
+                const response = await fetch('http://localhost:2020/courses/allCourses', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/xml',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeout);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const xmlText = await response.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                
+                // Check for XML parsing errors
+                const parserError = xmlDoc.getElementsByTagName("parsererror");
+                if (parserError.length > 0) {
+                    throw new Error("Error parsing XML response");
+                }
+                
+                displayCourses(xmlDoc, studentId, token);
+                
+            } catch (error) {
+                console.error('Fetch error:', error);
+                
+                let errorMessage = error.message;
+                if (error.name === 'AbortError') {
+                    errorMessage = "Request timed out. Please check your connection and try again.";
+                } else if (error.message.includes('Failed to fetch')) {
+                    errorMessage = "Could not connect to server. Please try again later.";
+                }
+                
+                coursesData.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="error">
+                            ${errorMessage}
+                            <button onclick="fetchCourses()" style="margin-left: 10px; padding: 5px 10px; background: #3498db; color: white; border: none; border-radius: 3px; cursor: pointer;">
+                                Retry
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        async function displayCourses(xmlDoc, studentId, token) {
+            const coursesData = document.getElementById('coursesData');
+            const items = xmlDoc.getElementsByTagName("item");
+            
+            coursesData.innerHTML = '';
+            
+            if (items.length === 0) {
+                coursesData.innerHTML = '<tr><td colspan="3">No courses available</td></tr>';
+                return;
+            }
+            
+            for (let item of items) {
+                const courseId = item.getElementsByTagName("id")[0].textContent;
+                const courseName = item.getElementsByTagName("name")[0].textContent;
+                
+                // Create row with loading state
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${courseId}</td>
+                    <td>${courseName}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn" disabled>Loading...</button>
+                            <button class="action-btn details-btn" onclick="viewCourseDetails(${courseId}, this)">
+                                View Details
+                            </button>
+                        </div>
+                        <div id="details-${courseId}" class="details-container" style="display: none;"></div>
+                    </td>
+                `;
+                coursesData.appendChild(row);
+                
+                // Check registration status for this course
+                await checkRegistrationStatus(courseId, studentId, token, row);
+            }
+        }
+
+        async function checkRegistrationStatus(courseId, studentId, token, row) {
+            try {
+                const response = await fetch(`http://localhost:2020/students/checkRegistery?studentId=${studentId}&courseId=${courseId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/xml',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const xmlText = await response.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                
+                // Check for XML parsing errors
+                const parserError = xmlDoc.getElementsByTagName("parsererror");
+                if (parserError.length > 0) {
+                    throw new Error("Error parsing XML response");
+                }
+                
+                const isRegistered = xmlDoc.getElementsByTagName("Boolean")[0].textContent === 'true';
+                
+                // Update the button based on registration status
+                const buttonsContainer = row.querySelector('.action-buttons');
+                buttonsContainer.innerHTML = `
+                    ${isRegistered ? 
+                        `<button class="action-btn drop-btn" onclick="dropCourse(${courseId}, this, ${studentId})">
+                            Drop
+                        </button>` : 
+                        `<button class="action-btn register-btn" onclick="registerCourse(${courseId}, this)">
+                            Register
+                        </button>`
+                    }
+                    <button class="action-btn details-btn" onclick="viewCourseDetails(${courseId}, this)">
+                        View Details
+                    </button>
+                `;
+                
+                // Store registration status
+                if (isRegistered) {
+                    registeredCourses.push(courseId);
+                }
+                
+            } catch (error) {
+                console.error('Error checking registration status:', error);
+                const buttonsContainer = row.querySelector('.action-buttons');
+                buttonsContainer.innerHTML = `
+                    <button class="action-btn" disabled>Error</button>
+                    <button class="action-btn details-btn" onclick="viewCourseDetails(${courseId}, this)">
+                        View Details
+                    </button>
+                `;
+            }
+        }
+
+        async function viewCourseDetails(courseId, button) {
+            const token = localStorage.getItem('authToken');
+            const detailsContainer = document.getElementById(`details-${courseId}`);
+            
+            // Toggle details visibility
+            if (detailsContainer.style.display === 'block') {
+                detailsContainer.style.display = 'none';
+                return;
+            }
+            
+            button.disabled = true;
+            button.textContent = 'Loading...';
+            detailsContainer.style.display = 'block';
+            detailsContainer.innerHTML = '<p>Loading course details...</p>';
+            
+            try {
+                const response = await fetch(`http://localhost:2020/students/viewCourseDetails/${courseId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/xml',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const xmlText = await response.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                
+                // Check for XML parsing errors
+                const parserError = xmlDoc.getElementsByTagName("parsererror");
+                if (parserError.length > 0) {
+                    throw new Error("Error parsing XML response");
+                }
+                
+                const item = xmlDoc.getElementsByTagName("item")[0];
+                if (!item) {
+                    throw new Error("No details found for this course");
+                }
+                
+                const detailsText = item.textContent;
+                
+                // Format the details for display
+                let formattedDetails = detailsText;
+                if (detailsText.includes("Course ID:")) {
+                    formattedDetails = detailsText
+                        .split(', ')
+                        .map(detail => `<p>${detail.trim()}</p>`)
+                        .join('');
+                }
+                
+                detailsContainer.innerHTML = formattedDetails;
+                
+            } catch (error) {
+                console.error('Error fetching course details:', error);
+                detailsContainer.innerHTML = `<p>Error loading details: ${error.message}</p>`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'View Details';
+            }
+        }
+
+        async function registerCourse(courseId, button) {
+            const studentId = localStorage.getItem('userId');
+            const token = localStorage.getItem('authToken');
+            const resultDiv = document.getElementById('result');
+            
+            if (!studentId) {
+                showResult('Student ID not found. Please login again.', 'error-message');
+                return;
+            }
+            
+            button.disabled = true;
+            button.textContent = 'Registering...';
+            
+            try {
+                // Prepare XML request body
+                const xmlBody = `<List><Long>${courseId}</Long></List>`;
+                
+                const response = await fetch(`http://localhost:2020/students/registerCourse/${studentId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/xml',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: xmlBody
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText || 'Registration failed');
+                }
+                
+                const responseText = await response.text();
+                showResult(`Successfully registered for course! ${responseText}`, 'success');
+                
+                // Update UI to show Drop button
+                const buttonsContainer = button.parentElement;
+                buttonsContainer.innerHTML = `
+                    <button class="action-btn drop-btn" onclick="dropCourse(${courseId}, this, ${studentId})">
+                        Drop
+                    </button>
+                    <button class="action-btn details-btn" onclick="viewCourseDetails(${courseId}, this)">
+                        View Details
+                    </button>
+                `;
+                
+                // Add to registered courses
+                registeredCourses.push(courseId);
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                
+                let errorMessage = error.message;
+                if (error.message.includes('already registered')) {
+                    errorMessage = "You are already registered for this course.";
+                } else if (error.message.includes('not found')) {
+                    errorMessage = "Course not found.";
+                }
+                
+                showResult(`Registration failed: ${errorMessage}`, 'error-message');
+                button.disabled = false;
+                button.textContent = 'Register';
+            }
+        }
+
+        async function dropCourse(courseId, button, studentId) {
+            const token = localStorage.getItem('authToken');
+            const resultDiv = document.getElementById('result');
+            
+            button.disabled = true;
+            button.textContent = 'Dropping...';
+            
+            try {
+                const response = await fetch(`http://localhost:2020/students/dropCourse/${courseId}/${studentId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText || 'Drop failed');
+                }
+                
+                const responseText = await response.text();
+                showResult(`Successfully dropped course! ${responseText}`, 'success');
+                
+                // Update UI to show Register button
+                const buttonsContainer = button.parentElement;
+                buttonsContainer.innerHTML = `
+                    <button class="action-btn register-btn" onclick="registerCourse(${courseId}, this)">
+                        Register
+                    </button>
+                    <button class="action-btn details-btn" onclick="viewCourseDetails(${courseId}, this)">
+                        View Details
+                    </button>
+                `;
+                
+                // Remove from registered courses
+                registeredCourses = registeredCourses.filter(id => id !== courseId);
+                
+            } catch (error) {
+                console.error('Drop error:', error);
+                
+                let errorMessage = error.message;
+                if (error.message.includes('not registered')) {
+                    errorMessage = "You are not registered for this course.";
+                } else if (error.message.includes('not found')) {
+                    errorMessage = "Course not found.";
+                }
+                
+                showResult(`Drop failed: ${errorMessage}`, 'error-message');
+                button.disabled = false;
+                button.textContent = 'Drop';
+            }
+        }
+
+        function showResult(message, className) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${className}`;
+            resultDiv.innerHTML = message;
+            resultDiv.style.display = 'block';
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+            
+            // Hide message after 5 seconds
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

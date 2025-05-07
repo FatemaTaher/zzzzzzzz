@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard</title>
+    <style>
+        /* الأنماط الأساسية */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            animation: bounceIn 1s ease;
+        }
+
+        form {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.8s ease;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        input:focus, button:focus {
+            outline: none;
+            border-color: #4e73df;
+        }
+
+        button {
+            background-color: #4e73df;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #2e59d9;
+            animation: scaleUp 0.3s ease-in-out;
+        }
+
+        /* التأثيرات المتحركة */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes bounceIn {
+            from {
+                transform: translateY(-2000px);
+            }
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(-300px);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes scaleUp {
+            from {
+                transform: scale(1);
+            }
+            to {
+                transform: scale(1.1);
+            }
+        }
+
+        pre {
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Student Dashboard</h1>
+
+    <!-- فورم لعرض الكورسات -->
+    <form id="viewCourseForm">
+        <label for="studentId">Student ID</label>
+        <input type="number" id="studentId" name="studentId" placeholder="Enter Student ID" required>
+        <button type="submit">View Course Details</button>
+    </form>
+
+    <!-- فورم لتسجيل الكورسات -->
+    <form id="registerCourseForm">
+        <label for="courseIds">Course IDs (Comma Separated)</label>
+        <input type="text" id="courseIds" name="courseIds" placeholder="Enter Course IDs" required>
+        <button type="submit">Register Courses</button>
+    </form>
+
+    <div id="responseContainer">
+        <!-- سيتم عرض الاستجابة هنا -->
+    </div>
+
+    <script>
+        // الوظيفة لعرض تفاصيل الكورسات
+        document.getElementById("viewCourseForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+
+            const studentId = document.getElementById("studentId").value;
+            fetch(`http://localhost:2020/students/viewCourseDetails/${studentId}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/xml'
+                }
+            })
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById("responseContainer").innerHTML = `<pre>${data}</pre>`;
+            })
+            .catch(error => {
+                document.getElementById("responseContainer").innerHTML = `<pre>Error: ${error}</pre>`;
+            });
+        });
+
+        // الوظيفة لتسجيل الكورسات
+        document.getElementById("registerCourseForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+
+            const studentId = document.getElementById("studentId").value;
+            const courseIds = document.getElementById("courseIds").value.split(',').map(id => id.trim());
+
+            fetch(`http://localhost:2020/students/registerCourse/${studentId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/xml',
+                    'Accept': 'application/xml'
+                },
+                body: `<List>${courseIds.map(id => `<Long>${id}</Long>`).join('')}</List>`
+            })
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById("responseContainer").innerHTML = `<pre>${data}</pre>`;
+            })
+            .catch(error => {
+                document.getElementById("responseContainer").innerHTML = `<pre>Error: ${error}</pre>`;
+            });
+        });
+    </script>
+
+</body>
+</html>

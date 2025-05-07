@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservation History</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #e3f2fd;
+        }
+        .status-pending {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        .status-approved, .status-accepted, .status-acceptd {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+        .status-rejected {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .status-canceled {
+            color: #9c9c9c;
+            font-weight: bold;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+        .error {
+            color: #e74c3c;
+            text-align: center;
+            padding: 20px;
+            font-weight: bold;
+        }
+        .error button {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .comment-cell {
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Reservation History</h1>
+        
+        <div class="form-group">
+            <label for="reservationIdInput">Enter Reservation ID:</label>
+            <input type="number" id="reservationIdInput" min="1" required>
+            <button onclick="loadReservationHistory()">Load History</button>
+        </div>
+        
+        <table id="historyTable">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Date & Time</th>
+                    <th>Action By</th>
+                    <th>Comments</th>
+                </tr>
+            </thead>
+            <tbody id="historyData">
+                <tr>
+                    <td colspan="4" class="loading">Please enter a reservation ID and click "Load History"</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function loadReservationHistory() {
+            const reservationId = document.getElementById('reservationIdInput').value;
+            const tbody = document.getElementById('historyData');
+            
+            if (!reservationId) {
+                tbody.innerHTML = '<tr><td colspan="4" class="error">Please enter a valid reservation ID</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '<tr><td colspan="4" class="loading">Loading reservation history...</td></tr>';
+            
+            fetch(`http://localhost:2020/professors/reservationsHistory/${reservationId}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/xml'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(xmlText => {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                
+                // Check for XML parsing errors
+                const parserError = xmlDoc.getElementsByTagName("parsererror");
+                if (parserError.length > 0) {
+                    throw new Error("Error parsing XML response");
+                }
+                
+                const items = xmlDoc.getElementsByTagName("item");
+                tbody.innerHTML = '';
+                
+                if (items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4">No reservation history found for ID: ' + reservationId + '</td></tr>';
+                    return;
+                }
+                
+                for (let item of items) {
+                    const status = item.getElementsByTagName("status")[0].textContent;
+                    const actionBy = item.getElementsByTagName("actionBy")[0].textContent;
+                    const comment = item.getElementsByTagName("comment")[0]?.textContent || '';
+                    
+                    // Parse the actionTime components
+                    const timeParts = item.getElementsByTagName("actionTime");
+                    const year = timeParts[0].textContent;
+                    const month = timeParts[1].textContent.padStart(2, '0');
+                    const day = timeParts[2].textContent.padStart(2, '0');
+                    const hour = timeParts[3].textContent.padStart(2, '0');
+                    const minute = timeParts[4].textContent.padStart(2, '0');
+                    const second = timeParts[5].textContent.padStart(2, '0');
+                    
+                    const formattedDate = `${year}-${month}-${day}`;
+                    const formattedTime = `${hour}:${minute}:${second}`;
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="status-${status.toLowerCase()}">${status}</td>
+                        <td>${formattedDate}<br>${formattedTime}</td>
+                        <td>${actionBy}</td>
+                        <td class="comment-cell" title="${comment}">${comment}</td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="error">
+                            Error loading reservation history: ${error.message}
+                            <button onclick="loadReservationHistory()">Try Again</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>

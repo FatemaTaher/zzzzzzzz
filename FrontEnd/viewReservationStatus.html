@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservation Status Check</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            width: 90%;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        input[type="number"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 25px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #result {
+            padding: 25px;
+            border-radius: 6px;
+            margin: 25px 0;
+            background-color: #f8f9fa;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            font-size: 18px;
+        }
+        .pending {
+            color: #f39c12;
+            font-weight: bold;
+            border-left: 4px solid #f39c12;
+        }
+        .approved, .accepted {
+            color: #2ecc71;
+            font-weight: bold;
+            border-left: 4px solid #2ecc71;
+        }
+        .rejected {
+            color: #e74c3c;
+            font-weight: bold;
+            border-left: 4px solid #e74c3c;
+        }
+        .error {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .loading {
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        .timestamp {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Reservation Status Check</h2>
+        <div class="input-group">
+            <input type="number" id="reservationId" placeholder="Enter Reservation ID" min="1">
+            <button onclick="checkStatus()">Check Status</button>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function checkStatus() {
+            const id = document.getElementById('reservationId').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!id) {
+                resultDiv.innerHTML = '<span class="error">Please enter a reservation ID</span>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="loading">Checking reservation status...</div>';
+            
+            try {
+                const response = await fetch(`http://localhost:2020/professors/reservationStatus/${id}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Server returned status: ${response.status}`);
+                }
+                
+                const text = await response.text();
+                const statusMatch = text.match(/Reservation status: (\w+)/i);
+                const status = statusMatch ? statusMatch[1].toLowerCase() : 'unknown';
+                
+                // Clear previous classes
+                resultDiv.className = '';
+                resultDiv.classList.add(status);
+                
+                resultDiv.innerHTML = `
+                    <strong>${text}</strong>
+                    <div class="timestamp">Last checked: ${new Date().toLocaleString()}</div>
+                `;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
